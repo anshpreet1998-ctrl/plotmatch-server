@@ -202,7 +202,7 @@ app.use(bodyParser.json());
 app.get('/', (_, res) => res.send('PlotMatch server is live ✅'));
  
 app.get('/requirements', (_, res) => {
-  res.json(readDB().requirements);
+  res.header('Access-Control-Allow-Origin', '*'); res.json(readDB().requirements);
 });
  
 app.post('/webhook', async (req, res) => {
@@ -278,6 +278,52 @@ app.post('/webhook', async (req, res) => {
   }
 });
  
+ 
+// ── Manual add from dashboard ─────────────────────────────────────────
+app.post('/add', async (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  try {
+    const body = req.body;
+    const item = {
+      id: uid(),
+      type: body.type || 'buy',
+      category: body.category || '',
+      bhk: body.bhk || '',
+      locality: body.locality || '',
+      subLocality: body.subLocality || '',
+      size: parseFloat(body.size) || null,
+      unit: body.unit || '',
+      budgetMin: parseFloat(body.budgetMin) || null,
+      budgetMax: parseFloat(body.budgetMax) || null,
+      facing: body.facing || '',
+      contact: body.contact || '',
+      notes: body.notes || '',
+      rawText: body.rawText || '',
+      source: 'dashboard',
+      createdAt: Date.now()
+    };
+    const data = readDB();
+    const hits = findMatches(item, data.requirements);
+    data.requirements.unshift(item);
+    writeDB(data);
+    res.json({ success: true, item, matches: hits });
+  } catch(err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+ 
+app.options('/add', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.send();
+});
+ 
+app.options('/requirements', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.send();
+});
+ 
 app.listen(PORT, () => {
   console.log(`\n✅ PlotMatch server running on port ${PORT}`);
   console.log(`   ANTHROPIC_API_KEY : ${ANTHROPIC_API_KEY ? 'SET ✓' : 'MISSING ✗'}`);
@@ -285,3 +331,4 @@ app.listen(PORT, () => {
   console.log(`   TWILIO_AUTH_TOKEN : ${TWILIO_AUTH_TOKEN ? 'SET ✓' : 'MISSING ✗'}`);
   console.log(`   TWILIO_WA_FROM    : ${TWILIO_WHATSAPP_FROM || 'MISSING ✗'}\n`);
 });
+ 
