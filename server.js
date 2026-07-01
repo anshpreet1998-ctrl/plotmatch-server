@@ -3,23 +3,23 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const fetch = require('node-fetch');
 const twilio = require('twilio');
-const low = require('lowdb');
-const FileSync = require('lowdb/adapters/FileSync');
+const fs = require('fs');
+const path = require('path');
 
 const PORT = process.env.PORT || 3000;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_WHATSAPP_FROM = process.env.TWILIO_WHATSAPP_FROM; // e.g. "whatsapp:+14155238886"
+const TWILIO_WHATSAPP_FROM = process.env.TWILIO_WHATSAPP_FROM;
 
 const twilioClient = (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN)
   ? twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
   : null;
 
-// ---------- tiny JSON database ----------
-const adapter = new FileSync('db.json');
-const db = low(adapter);
-db.defaults({ requirements: [] }).write();
+// ---------- plain JSON file database (no lowdb needed) ----------
+const DB_FILE = path.join(__dirname, 'db.json');
+function readDB(){ try { return JSON.parse(fs.readFileSync(DB_FILE,'utf8')); } catch(e){ return { requirements:[] }; } }
+function writeDB(data){ fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2)); }
 
 function uid(){ return 'r_' + Date.now() + '_' + Math.random().toString(36).slice(2,7); }
 
@@ -53,118 +53,105 @@ async function parseWithClaude(text){
   return JSON.parse(clean);
 }
 
-// ---------- matchmaking engine (same logic as the dashboard) ----------
-function normLoc(s){ return (s || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
-
+// ---------- matchmaking ----------
+function normLoc(s){ return (s||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
 function fmtINR(n){
-  if (n === null || n === undefined) return null;
-  if (n >= 10000000) return '₹' + (n / 10000000).toFixed(n % 10000000 === 0 ? 0 : 2) + ' Cr';
-  if (n >= 100000) return '₹' + (n / 100000).toFixed(n % 100000 === 0 ? 0 : 1) + ' L';
-  return '₹' + n.toLocaleString('en-IN');
+  if(n===null||n===undefined) return null;
+  if(n>=10000000) return '₹'+(n/10000000).toFixed(n%10000000===0?0:2)+' Cr';
+  if(n>=100000) return '₹'+(n/100000).toFixed(n%100000===0?0:1)+' L';
+  return '₹'+n.toLocaleString('en-IN');
 }
-function fmtBudget(min, max){
-  if (min && max) return fmtINR(min) + ' – ' + fmtINR(max);
-  if (max) return 'up to ' + fmtINR(max);
-  if (min) return fmtINR(min) + '+';
+function fmtBudget(min,max){
+  if(min&&max) return fmtINR(min)+' – '+fmtINR(max);
+  if(max) return 'up to '+fmtINR(max);
+  if(min) return fmtINR(min)+'+';
   return 'budget n/a';
 }
 function summarize(item){
-  const bits = [item.category || 'Property'];
-  if (item.bhk) bits.push(item.bhk);
-  if (item.locality) bits.push('in ' + item.locality);
-  if (item.size) bits.push(item.size + ' ' + (item.unit || ''));
-  if (item.facing) bits.push(item.facing + ' facing');
-  bits.push(fmtBudget(item.budgetMin, item.budgetMax));
+  const bits=[item.category||'Property'];
+  if(item.bhk) bits.push(item.bhk);
+  if(item.locality) bits.push('in '+item.locality);
+  if(item.size) bits.push(item.size+' '+(item.unit||''));
+  if(item.facing) bits.push(item.facing+' facing');
+  bits.push(fmtBudget(item.budgetMin,item.budgetMax));
   return bits.join(', ');
 }
 function shortLabel(item){
-  return (item.contact || item.id) + ' — ' + (item.category || 'Property') +
-    (item.bhk ? (' ' + item.bhk) : '') + ' in ' + (item.locality || 'locality n/a');
+  return (item.contact||item.id)+' — '+(item.category||'Property')+(item.bhk?' '+item.bhk:'')+' in '+(item.locality||'n/a');
 }
-function strictCompatible(buyer, seller){
-  const lb = normLoc(buyer.locality), ls = normLoc(seller.locality);
-  const locationOk = lb && ls && (lb === ls || lb.includes(ls) || ls.includes(lb));
-  const categoryOk = !buyer.category || !seller.category || buyer.category === seller.category;
-  const buyerMax = buyer.budgetMax || buyer.budgetMin;
-  const sellerAsk = seller.budgetMax || seller.budgetMin;
-  const budgetOk = (!buyerMax || !sellerAsk) ? false : buyerMax >= sellerAsk * 0.95;
-  return locationOk && categoryOk && budgetOk;
+function strictCompatible(buyer,seller){
+  const lb=normLoc(buyer.locality),ls=normLoc(seller.locality);
+  const locationOk=lb&&ls&&(lb===ls||lb.includes(ls)||ls.includes(lb));
+  const categoryOk=!buyer.category||!seller.category||buyer.category===seller.category;
+  const buyerMax=buyer.budgetMax||buyer.budgetMin;
+  const sellerAsk=seller.budgetMax||seller.budgetMin;
+  const budgetOk=(!buyerMax||!sellerAsk)?false:buyerMax>=sellerAsk*0.95;
+  return locationOk&&categoryOk&&budgetOk;
 }
-function runMatchEngine(newItem, allItems){
-  const opposite = newItem.type === 'buy' ? allItems.filter(d => d.type === 'sell' && d.id !== newItem.id)
-                  : newItem.type === 'sell' ? allItems.filter(d => d.type === 'buy' && d.id !== newItem.id)
-                  : allItems.filter(d => d.type === 'rent' && d.id !== newItem.id);
-  for (const cand of opposite) {
-    const buyer = newItem.type === 'sell' ? cand : newItem;
-    const seller = newItem.type === 'sell' ? newItem : cand;
-    if (strictCompatible(buyer, seller)) return { buyer, seller };
+function runMatchEngine(newItem,allItems){
+  const opposite=newItem.type==='buy'?allItems.filter(d=>d.type==='sell'&&d.id!==newItem.id)
+    :newItem.type==='sell'?allItems.filter(d=>d.type==='buy'&&d.id!==newItem.id)
+    :allItems.filter(d=>d.type==='rent'&&d.id!==newItem.id);
+  for(const cand of opposite){
+    const buyer=newItem.type==='sell'?cand:newItem;
+    const seller=newItem.type==='sell'?newItem:cand;
+    if(strictCompatible(buyer,seller)) return {buyer,seller};
   }
   return null;
 }
 
-// ---------- Twilio reply helper ----------
-async function sendWhatsApp(to, body){
-  if (!twilioClient || !TWILIO_WHATSAPP_FROM) {
-    console.log('[would send WhatsApp to', to, ']', body);
-    return;
-  }
-  await twilioClient.messages.create({
-    from: TWILIO_WHATSAPP_FROM,
-    to,
-    body
-  });
+// ---------- Twilio reply ----------
+async function sendWhatsApp(to,body){
+  if(!twilioClient||!TWILIO_WHATSAPP_FROM){ console.log('[WA to',to,']',body); return; }
+  await twilioClient.messages.create({ from:TWILIO_WHATSAPP_FROM, to, body });
 }
 
-// ---------- app ----------
+// ---------- Express app ----------
 const app = express();
-app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.urlencoded({ extended:false }));
 app.use(bodyParser.json());
 
-app.get('/', (req, res) => {
-  res.send('PlotMatch webhook server is running. POST WhatsApp messages to /webhook.');
+app.get('/', (req,res) => res.send('PlotMatch webhook server is running ✅'));
+
+app.get('/requirements', (req,res) => {
+  const data = readDB();
+  res.json(data.requirements);
 });
 
-app.get('/requirements', (req, res) => {
-  res.json(db.get('requirements').value());
-});
-
-app.post('/webhook', async (req, res) => {
+app.post('/webhook', async (req,res) => {
   const body = req.body.Body || '';
-  const from = req.body.From || ''; // e.g. "whatsapp:+9198xxxxxxx0"
+  const from = req.body.From || '';
   const profileName = req.body.ProfileName || '';
 
-  // Always acknowledge Twilio immediately to avoid timeout/retries
   res.status(200).send('<Response></Response>');
-
-  if (!body.trim()) return;
+  if(!body.trim()) return;
 
   try {
     const parsed = await parseWithClaude(body);
     const item = Object.assign({
-      id: uid(),
-      type: 'buy', category: '', bhk: '', locality: '', size: null, unit: '',
-      budgetMin: null, budgetMax: null, facing: '', contact: profileName || from, notes: '',
-      rawText: body, source: from, createdAt: Date.now()
-    }, parsed, { contact: parsed.contact || profileName || from, rawText: body, source: from });
+      id:uid(), type:'buy', category:'', bhk:'', locality:'', size:null, unit:'',
+      budgetMin:null, budgetMax:null, facing:'', contact:profileName||from, notes:'',
+      rawText:body, source:from, createdAt:Date.now()
+    }, parsed, { contact:parsed.contact||profileName||from, rawText:body, source:from });
 
-    const all = db.get('requirements').value();
-    const hit = runMatchEngine(item, all);
+    const data = readDB();
+    const hit = runMatchEngine(item, data.requirements);
+    data.requirements.unshift(item);
+    writeDB(data);
 
-    db.get('requirements').push(item).write();
-
-    if (hit) {
+    if(hit){
       const alert =
-        `MUTUAL MATCH IDENTIFIED!\n\n` +
-        `Buyer: ${shortLabel(hit.buyer)} — ${summarize(hit.buyer)}\n` +
-        `Seller: ${shortLabel(hit.seller)} — ${summarize(hit.seller)}\n\n` +
-        `Locality matches and budget covers the asking price. Time to connect them.`;
+        `🎯 MUTUAL MATCH IDENTIFIED!\n\n`+
+        `Buyer: ${shortLabel(hit.buyer)}\n${summarize(hit.buyer)}\n\n`+
+        `Seller: ${shortLabel(hit.seller)}\n${summarize(hit.seller)}\n\n`+
+        `Locality & budget align — time to connect them!`;
       await sendWhatsApp(from, alert);
     } else {
-      await sendWhatsApp(from, `Saved: ${summarize(item)}. No match yet — you'll be notified the moment a compatible entry comes in.`);
+      await sendWhatsApp(from, `✅ Saved: ${summarize(item)}\n\nNo match yet — you'll be notified the moment a compatible entry comes in.`);
     }
-  } catch (err) {
-    console.error('Error processing message:', err);
-    await sendWhatsApp(from, "Couldn't parse that message automatically. Please check the wording or add it manually in the dashboard.");
+  } catch(err){
+    console.error('Error:', err);
+    await sendWhatsApp(from, "⚠️ Couldn't parse that message. Try rephrasing or add it manually in the dashboard.");
   }
 });
 
