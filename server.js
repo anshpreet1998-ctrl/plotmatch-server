@@ -1,158 +1,136 @@
 require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
-const fetch = require('node-fetch');
-const twilio = require('twilio');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
-
-const PORT = process.env.PORT || 3000;
+ 
+const PORT = process.env.PORT || 10000;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
 const TWILIO_WHATSAPP_FROM = process.env.TWILIO_WHATSAPP_FROM;
-
-const twilioClient = (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN)
-  ? twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-  : null;
-
-// ---------- plain JSON file database (no lowdb needed) ----------
-const DB_FILE = path.join(__dirname, 'db.json');
+ 
+// ---------- plain JSON database ----------
+const DB_FILE = path.join('/tmp', 'db.json');
 function readDB(){ try { return JSON.parse(fs.readFileSync(DB_FILE,'utf8')); } catch(e){ return { requirements:[] }; } }
 function writeDB(data){ fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2)); }
-
 function uid(){ return 'r_' + Date.now() + '_' + Math.random().toString(36).slice(2,7); }
-
-// ---------- Claude parsing ----------
-const SYSTEM_PROMPT = `You are a real-estate data extraction agent for the Faridabad, Haryana (NCR, India) market. Extract a SINGLE structured requirement from a raw WhatsApp message written in Hindi/English/Hinglish. You understand local real-estate vocabulary: plot, floor (independent floor), flat, builder floor, kothi, file (an under-construction/unregistered plot allotment paper), BHK, sq.yd / gaj / gajj (1 gaj = 1 sq.yd), marla (~272.25 sq.ft in Haryana), kanal (20 marla), biswa, acre, sq.ft, corner plot, park-facing, road-facing, north/south/east/west facing and combinations (north-east etc), registry, conversion (CLU), HUDA/HSVP sector numbers, cr (crore), lac/lakh as currency shorthand.
-
-Respond ONLY with raw JSON (no markdown fences, no prose) matching this exact schema:
-{"type":"buy|sell|rent","category":"Plot|Floor|Flat|House|Shop|Office|Other","bhk":"string or empty","locality":"string","size":number or null,"unit":"sq.yd|gaj|marla|kanal|sq.ft|acre|biswa or empty","budgetMin":number or null,"budgetMax":number or null,"facing":"North|South|East|West|North-East|North-West|South-East|South-West|Corner or empty","contact":"string or empty","notes":"string, any extra detail like file/registry/road width/condition"}
-
-Rules: convert crore/lakh/lac into full rupee numbers (1.5 cr = 15000000, 50 lac = 5000000). If only one budget figure given, set it as budgetMax. gaj and sq.yd are the same unit, normalize to "sq.yd". If type is unclear, infer "buy" when the message expresses wanting/looking for something ("chahiye", "looking for", "required"), and "sell" when offering/listing something ("available", "for sale", "becharu hai").`;
-
-async function parseWithClaude(text){
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01"
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1000,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: text }]
-    })
+ 
+// ---------- generic HTTPS POST helper ----------
+function httpsPost(hostname, path, headers, body){
+  return new Promise((resolve, reject) => {
+    const data = JSON.stringify(body);
+    const req = https.request({ hostname, path, method:'POST', headers:{ ...headers, 'Content-Length': Buffer.byteLength(data) } }, res => {
+      let raw = '';
+      res.on('data', chunk => raw += chunk);
+      res.on('end', () => { try { resolve(JSON.parse(raw)); } catch(e){ reject(new Error('Bad JSON: '+raw.slice(0,200))); } });
+    });
+    req.on('error', reject);
+    req.write(data);
+    req.end();
   });
-  const data = await resp.json();
-  if (!data.content) throw new Error("Claude API error: " + JSON.stringify(data));
-  const textOut = data.content.map(b => b.text || '').join('');
-  const clean = textOut.replace(/```json|```/g, '').trim();
-  return JSON.parse(clean);
 }
-
+ 
+// ---------- Claude parsing ----------
+const SYSTEM_PROMPT = `You are a real-estate data extraction agent for Faridabad, Haryana (NCR India). Extract ONE structured requirement from a WhatsApp message in Hindi/English/Hinglish.
+ 
+You understand: plot, floor, flat, builder floor, kothi, file (unregistered allotment paper), BHK, sq.yd/gaj (same unit), marla, kanal, biswa, acre, sq.ft, corner plot, park-facing, north/south/east/west facing, registry, CLU, HUDA/HSVP sectors, cr/crore, lac/lakh.
+ 
+Respond ONLY with raw JSON, no markdown, no prose:
+{"type":"buy|sell|rent","category":"Plot|Floor|Flat|House|Shop|Office|Other","bhk":"","locality":"","size":null,"unit":"sq.yd|marla|kanal|sq.ft|acre","budgetMin":null,"budgetMax":null,"facing":"North|South|East|West|North-East|North-West|South-East|South-West|Corner|","contact":"","notes":""}
+ 
+Rules: 1.5 cr = 15000000, 50 lac = 5000000. gaj = sq.yd. "chahiye/looking for/required" = buy. "available/for sale/bechna hai" = sell. Single budget = budgetMax.`;
+ 
+async function parseWithClaude(text){
+  const result = await httpsPost('api.anthropic.com', '/v1/messages',
+    { 'Content-Type':'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version':'2023-06-01' },
+    { model:'claude-sonnet-4-6', max_tokens:800, system: SYSTEM_PROMPT, messages:[{ role:'user', content: text }] }
+  );
+  if(!result.content) throw new Error('Claude error: '+JSON.stringify(result));
+  const text2 = result.content.map(b=>b.text||'').join('');
+  return JSON.parse(text2.replace(/```json|```/g,'').trim());
+}
+ 
+// ---------- Twilio WhatsApp ----------
+async function sendWhatsApp(to, body){
+  if(!TWILIO_ACCOUNT_SID||!TWILIO_AUTH_TOKEN||!TWILIO_WHATSAPP_FROM){ console.log('[WA]',to,body); return; }
+  const auth = Buffer.from(TWILIO_ACCOUNT_SID+':'+TWILIO_AUTH_TOKEN).toString('base64');
+  const params = new URLSearchParams({ From: TWILIO_WHATSAPP_FROM, To: to, Body: body }).toString();
+  return new Promise((resolve,reject)=>{
+    const req = https.request({
+      hostname:'api.twilio.com',
+      path:`/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
+      method:'POST',
+      headers:{ 'Authorization':'Basic '+auth, 'Content-Type':'application/x-www-form-urlencoded', 'Content-Length':Buffer.byteLength(params) }
+    }, res => { let r=''; res.on('data',c=>r+=c); res.on('end',()=>resolve(r)); });
+    req.on('error',reject);
+    req.write(params);
+    req.end();
+  });
+}
+ 
 // ---------- matchmaking ----------
 function normLoc(s){ return (s||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
 function fmtINR(n){
-  if(n===null||n===undefined) return null;
-  if(n>=10000000) return '₹'+(n/10000000).toFixed(n%10000000===0?0:2)+' Cr';
-  if(n>=100000) return '₹'+(n/100000).toFixed(n%100000===0?0:1)+' L';
-  return '₹'+n.toLocaleString('en-IN');
+  if(!n) return null;
+  if(n>=10000000) return '₹'+(n/10000000).toFixed(2)+' Cr';
+  if(n>=100000) return '₹'+(n/100000).toFixed(1)+' L';
+  return '₹'+n;
 }
-function fmtBudget(min,max){
-  if(min&&max) return fmtINR(min)+' – '+fmtINR(max);
-  if(max) return 'up to '+fmtINR(max);
-  if(min) return fmtINR(min)+'+';
-  return 'budget n/a';
-}
-function summarize(item){
-  const bits=[item.category||'Property'];
-  if(item.bhk) bits.push(item.bhk);
-  if(item.locality) bits.push('in '+item.locality);
-  if(item.size) bits.push(item.size+' '+(item.unit||''));
-  if(item.facing) bits.push(item.facing+' facing');
-  bits.push(fmtBudget(item.budgetMin,item.budgetMax));
-  return bits.join(', ');
-}
-function shortLabel(item){
-  return (item.contact||item.id)+' — '+(item.category||'Property')+(item.bhk?' '+item.bhk:'')+' in '+(item.locality||'n/a');
-}
+function fmtBudget(min,max){ return max?(min?fmtINR(min)+' – '+fmtINR(max):'up to '+fmtINR(max)):(min?fmtINR(min)+'+':'n/a'); }
+function summarize(i){ return [i.category,i.bhk,i.locality&&'in '+i.locality,i.size&&i.size+' '+i.unit,i.facing&&i.facing+' facing',fmtBudget(i.budgetMin,i.budgetMax)].filter(Boolean).join(', '); }
+function shortLabel(i){ return (i.contact||i.id)+' — '+(i.category||'Property')+(i.bhk?' '+i.bhk:'')+' in '+(i.locality||'n/a'); }
 function strictCompatible(buyer,seller){
   const lb=normLoc(buyer.locality),ls=normLoc(seller.locality);
-  const locationOk=lb&&ls&&(lb===ls||lb.includes(ls)||ls.includes(lb));
-  const categoryOk=!buyer.category||!seller.category||buyer.category===seller.category;
-  const buyerMax=buyer.budgetMax||buyer.budgetMin;
-  const sellerAsk=seller.budgetMax||seller.budgetMin;
-  const budgetOk=(!buyerMax||!sellerAsk)?false:buyerMax>=sellerAsk*0.95;
-  return locationOk&&categoryOk&&budgetOk;
+  if(!lb||!ls||!(lb===ls||lb.includes(ls)||ls.includes(lb))) return false;
+  if(buyer.category&&seller.category&&buyer.category!==seller.category) return false;
+  const bMax=buyer.budgetMax||buyer.budgetMin, sAsk=seller.budgetMax||seller.budgetMin;
+  if(!bMax||!sAsk) return false;
+  return bMax>=sAsk*0.95;
 }
-function runMatchEngine(newItem,allItems){
-  const opposite=newItem.type==='buy'?allItems.filter(d=>d.type==='sell'&&d.id!==newItem.id)
-    :newItem.type==='sell'?allItems.filter(d=>d.type==='buy'&&d.id!==newItem.id)
-    :allItems.filter(d=>d.type==='rent'&&d.id!==newItem.id);
-  for(const cand of opposite){
-    const buyer=newItem.type==='sell'?cand:newItem;
-    const seller=newItem.type==='sell'?newItem:cand;
+function runMatchEngine(newItem,all){
+  const opp=newItem.type==='buy'?all.filter(d=>d.type==='sell'&&d.id!==newItem.id)
+    :newItem.type==='sell'?all.filter(d=>d.type==='buy'&&d.id!==newItem.id)
+    :all.filter(d=>d.type==='rent'&&d.id!==newItem.id);
+  for(const c of opp){
+    const buyer=newItem.type==='sell'?c:newItem, seller=newItem.type==='sell'?newItem:c;
     if(strictCompatible(buyer,seller)) return {buyer,seller};
   }
   return null;
 }
-
-// ---------- Twilio reply ----------
-async function sendWhatsApp(to,body){
-  if(!twilioClient||!TWILIO_WHATSAPP_FROM){ console.log('[WA to',to,']',body); return; }
-  await twilioClient.messages.create({ from:TWILIO_WHATSAPP_FROM, to, body });
-}
-
-// ---------- Express app ----------
+ 
+// ---------- Express ----------
 const app = express();
 app.use(bodyParser.urlencoded({ extended:false }));
 app.use(bodyParser.json());
-
-app.get('/', (req,res) => res.send('PlotMatch webhook server is running ✅'));
-
-app.get('/requirements', (req,res) => {
-  const data = readDB();
-  res.json(data.requirements);
-});
-
+ 
+app.get('/', (_,res) => res.send('PlotMatch is running ✅'));
+app.get('/requirements', (_,res) => res.json(readDB().requirements));
+ 
 app.post('/webhook', async (req,res) => {
-  const body = req.body.Body || '';
-  const from = req.body.From || '';
-  const profileName = req.body.ProfileName || '';
-
+  const body = req.body.Body||'';
+  const from = req.body.From||'';
+  const profileName = req.body.ProfileName||'';
   res.status(200).send('<Response></Response>');
   if(!body.trim()) return;
-
   try {
     const parsed = await parseWithClaude(body);
-    const item = Object.assign({
-      id:uid(), type:'buy', category:'', bhk:'', locality:'', size:null, unit:'',
-      budgetMin:null, budgetMax:null, facing:'', contact:profileName||from, notes:'',
-      rawText:body, source:from, createdAt:Date.now()
-    }, parsed, { contact:parsed.contact||profileName||from, rawText:body, source:from });
-
+    const item = { id:uid(), type:'buy', category:'', bhk:'', locality:'', size:null, unit:'', budgetMin:null, budgetMax:null, facing:'', contact:profileName||from, notes:'', rawText:body, source:from, createdAt:Date.now(), ...parsed, contact:parsed.contact||profileName||from, rawText:body, source:from };
     const data = readDB();
     const hit = runMatchEngine(item, data.requirements);
     data.requirements.unshift(item);
     writeDB(data);
-
     if(hit){
-      const alert =
-        `🎯 MUTUAL MATCH IDENTIFIED!\n\n`+
-        `Buyer: ${shortLabel(hit.buyer)}\n${summarize(hit.buyer)}\n\n`+
-        `Seller: ${shortLabel(hit.seller)}\n${summarize(hit.seller)}\n\n`+
-        `Locality & budget align — time to connect them!`;
-      await sendWhatsApp(from, alert);
+      await sendWhatsApp(from, `🎯 MUTUAL MATCH IDENTIFIED!\n\nBuyer: ${shortLabel(hit.buyer)}\n${summarize(hit.buyer)}\n\nSeller: ${shortLabel(hit.seller)}\n${summarize(hit.seller)}\n\nLocality & budget align — connect them now!`);
     } else {
-      await sendWhatsApp(from, `✅ Saved: ${summarize(item)}\n\nNo match yet — you'll be notified the moment a compatible entry comes in.`);
+      await sendWhatsApp(from, `✅ Saved: ${summarize(item)}\n\nNo match yet. You'll be notified the moment a compatible entry comes in.`);
     }
   } catch(err){
-    console.error('Error:', err);
-    await sendWhatsApp(from, "⚠️ Couldn't parse that message. Try rephrasing or add it manually in the dashboard.");
+    console.error('Webhook error:', err.message);
+    await sendWhatsApp(from, `⚠️ Could not parse: "${body.slice(0,60)}..."\nTry rephrasing or add manually.`);
   }
 });
-
-app.listen(PORT, () => console.log(`PlotMatch server listening on port ${PORT}`));
+ 
+app.listen(PORT, () => console.log(`PlotMatch listening on port ${PORT} ✅`));
+ 
