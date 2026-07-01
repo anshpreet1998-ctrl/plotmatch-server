@@ -1,7 +1,6 @@
 {
   "name": "plotmatch-server",
   "version": "1.0.0",
-  "description": "Twilio WhatsApp webhook + Claude parser + matchmaking engine for PlotMatch",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
@@ -10,8 +9,6 @@
   "dependencies": {
     "express": "^4.19.2",
     "body-parser": "^1.20.2",
-    "twilio": "^5.3.0",
-    "node-fetch": "^2.7.0",
     "dotenv": "^16.4.5"
   }
 }
