@@ -98,11 +98,27 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
  
 // Health check
-app.get('/', (_, res) => res.json({
-  status: 'PlotMatch running ✅',
-  inbox: inbox.length,
-  processed: processedCount
-}));
+app.get('/', (_, res) => res.send(`<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>PlotMatch Server</title>
+<style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#F5EFE4;}
+.box{text-align:center;background:#fff;border-radius:12px;padding:40px;box-shadow:0 4px 20px rgba(0,0,0,.1);}
+h1{color:#1A6B3C;font-size:28px;margin-bottom:8px;}p{color:#7A7164;font-size:14px;}
+.badge{background:#EAF4ED;color:#1A6B3C;border:1px solid #1A6B3C;border-radius:20px;padding:6px 16px;font-size:13px;font-weight:700;display:inline-block;margin-bottom:20px;}
+.stat{display:inline-block;margin:0 12px;text-align:center;}
+.stat-n{font-size:24px;font-weight:800;color:#B5562F;}
+.stat-l{font-size:11px;color:#aaa;text-transform:uppercase;}</style>
+</head>
+<body><div class="box">
+<div class="badge">✅ ONLINE</div>
+<h1>PlotMatch Server</h1>
+<p>Faridabad Real Estate Matchmaking Engine</p>
+<div style="margin-top:20px;">
+  <div class="stat"><div class="stat-n">${inbox.length}</div><div class="stat-l">Inbox</div></div>
+  <div class="stat"><div class="stat-n">${processedCount}</div><div class="stat-l">Processed</div></div>
+</div>
+<p style="margin-top:20px;font-size:12px;color:#ccc;">Webhook: POST /webhook &nbsp;·&nbsp; Inbox: GET /inbox</p>
+</div></body></html>`));
  
 // Dashboard polls this to get new WhatsApp messages
 app.get('/inbox', (req, res) => {
@@ -166,4 +182,3 @@ app.listen(PORT, () => {
   console.log(`   TWILIO_AUTH_TOKEN : ${TWILIO_AUTH_TOKEN ? 'SET ✓' : 'MISSING ✗'}`);
   console.log(`   TWILIO_WA_FROM    : ${TWILIO_WHATSAPP_FROM || 'MISSING ✗'}\n`);
 });
- 
