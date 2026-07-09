@@ -8,6 +8,7 @@ const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
 const TWILIO_WHATSAPP_FROM = process.env.TWILIO_WHATSAPP_FROM;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const WHAPI_TOKEN = process.env.WHAPI_TOKEN; // whapi.cloud token
  
 // ── IN-MEMORY INBOX (WhatsApp messages waiting for dashboard to pick up)
 let inbox = [];
@@ -168,12 +169,125 @@ app.post('/webhook', async (req, res) => {
   }
 });
  
+// ── Whapi.cloud send ──────────────────────────────────────────────────
+async function sendWhapiMessage(to, body) {
+  if (!WHAPI_TOKEN) { console.log('[Whapi skipped - no token]'); return; }
+  // to format: "919811234567" (no + or @)
+  const phone = to.replace(/[^0-9]/g, '');
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify({ to: phone, body });
+    const req = https.request({
+      hostname: 'gate.whapi.cloud',
+      path: '/messages/text',
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + WHAPI_TOKEN,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload)
+      }
+    }, res => {
+      let r = ''; res.on('data', c => r += c);
+      res.on('end', () => { console.log('[Whapi send]', r.slice(0,120)); resolve(r); });
+    });
+    req.on('error', e => { console.error('[Whapi error]', e.message); reject(e); });
+    req.write(payload); req.end();
+  });
+}
+ 
 function formatINR(n) {
   if (!n) return '';
   if (n >= 10000000) return (n/10000000).toFixed(2).replace(/\.?0+$/, '') + ' Cr';
   if (n >= 100000) return (n/100000).toFixed(1).replace(/\.?0+$/, '') + ' L';
   return n.toString();
 }
+ 
+// ── WHITELISTED GROUPS ─────────────────────────────────────────────────
+const ALLOWED_GROUPS = [
+  'Aagman Infra FBD Inventory',
+  'Bptp Properties Faridabad 🏠',
+  'All Properties Neharpar',
+  'ᴏɴʟʏ ꜰᴏʀ ʀᴇɴᴛ ꜰᴀʀɪᴅᴀʙᴀᴅ',
+  'Chikki Realtors Dealers Group',
+  'Faridabad Associates 2',
+  '🇮🇳 Only Renting In Fbd',
+  'AMAN PROPERTY'
+];
+ 
+// Groups that are rent-focused (helps AI classify correctly)
+const RENT_GROUPS = [
+  'ᴏɴʟʏ ꜰᴏʀ ʀᴇɴᴛ ꜰᴀʀɪᴅᴀʙᴀᴅ',
+  '🇮🇳 Only Renting In Fbd'
+];
+ 
+function isAllowedGroup(chatName) {
+  if (!chatName) return false;
+  // Exact match
+  if (ALLOWED_GROUPS.includes(chatName)) return true;
+  // Fuzzy match — handles minor emoji/spacing differences
+  const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return ALLOWED_GROUPS.some(g => norm(g) === norm(chatName));
+}
+ 
+// ── Whapi.cloud webhook ────────────────────────────────────────────────
+app.post('/whapi-webhook', async (req, res) => {
+  res.status(200).json({ status: 'ok' });
+ 
+  const messages = req.body.messages || [];
+  if (!messages.length) return;
+ 
+  for (const msg of messages) {
+    if (msg.type !== 'text') continue;
+    if (msg.from_me) continue;
+ 
+    const msgBody  = (msg.text && msg.text.body) ? msg.text.body.trim() : '';
+    const from     = msg.from || '';
+    const name     = msg.from_name || '';
+    const chatId   = msg.chat_id || from;
+    const chatName = msg.chat_name || msg.chat?.name || '';
+    const isGroup  = chatId.includes('@g.us');
+ 
+    if (!msgBody) continue;
+ 
+    // ── WHITELIST CHECK ────────────────────────────────────────────────
+    if (isGroup && !isAllowedGroup(chatName)) {
+      console.log(`[Whapi] SKIPPED group: "${chatName}"`);
+      continue; // ignore all other groups silently
+    }
+ 
+    // Skip non-group messages (personal chats)
+    if (!isGroup) {
+      console.log(`[Whapi] SKIPPED direct msg from: ${name}`);
+      continue;
+    }
+ 
+    console.log(`[Whapi] ✅ ALLOWED group: "${chatName}" | ${name} | ${msgBody.slice(0,80)}`);
+ 
+    // Check if this is a rent-focused group — hint to AI
+    const isRentGroup = RENT_GROUPS.some(g => g === chatName || chatName.toLowerCase().includes('rent'));
+    const rentHint = isRentGroup ? '\n\nNOTE: This message is from a RENT group. If intent is unclear, classify as rent_want or rent_have.' : '';
+ 
+    try {
+      const listings = await parseWithClaude(msgBody + rentHint);
+      if (!listings || !listings.length) continue;
+      console.log(`[Whapi] Parsed ${listings.length} listing(s) from "${chatName}"`);
+ 
+      inbox.push({
+        id: 'wa_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
+        listings,
+        rawText: msgBody,
+        from: from.replace('@s.whatsapp.net','').replace('@g.us',''),
+        name: name,
+        source: 'whatsapp-group',
+        chatName,
+        receivedAt: Date.now()
+      });
+      processedCount++;
+ 
+    } catch(err) {
+      console.error('[Whapi parse error]', err.message);
+    }
+  }
+});
  
 app.listen(PORT, () => {
   console.log(`\n✅ PlotMatch server on port ${PORT}`);
