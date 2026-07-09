@@ -57,16 +57,20 @@ PRICE FORMATS:
  
 EXTRACTION RULES:
 - CRITICAL: Extract EACH property as its own separate JSON object — NEVER merge multiple into one
-- NUMBERED LISTS (1. 2. 3.) = each number is a SEPARATE listing — extract ALL numbers
-- BULLETED LISTS (• - *) = each bullet is a SEPARATE listing — extract ALL bullets
-- If message has 3 numbered items → return array with 3 objects
+- A new listing starts when you see a new: sector number, society name, plot size, or price
+- NUMBERED LISTS (1. 2. 3.) = each number is a SEPARATE listing
+- BULLETED LISTS (• - * -) = each bullet is a SEPARATE listing
+- LINE BREAKS between properties = each block is a SEPARATE listing
+- SAME SELLER multiple properties = still separate listings, same contact on each
 - Contact/agent name+phone at BOTTOM applies to ALL listings above it
+- If unsure whether it's 1 listing or 2, prefer splitting into separate listings
 - Multiple sectors as requirement (84/85/86/87/88) = locality "Sector 84-88 Faridabad"
 - Notes: Stilt+4 approved, NOC, Registry case, Joda/Pair, furnishing, road width, society/project name, floor number
 - gaj=sq.yd. SF=sq.ft. Marla=272sq.ft. Kanal=20 marla.
 - "2 .10 Cr" or "2. 10 Cr" with space = 2.10 Cr = 21000000
 - "@ 2.55" after property = price 2.55 Cr = 25500000
 - Size range "1400-1450 feet" = use average 1425 as size in sq.ft
+- "Confirm Inventory" or "Available For Sale" = header, all items below are type=sell
  
 RETURN ONLY raw JSON array, zero markdown:
 [{"type":"buy|sell|rent_want|rent_have","category":"Plot|Floor|Flat|House|Shop|Office|Other","bhk":"","locality":"","subLocality":"","size":null,"unit":"sq.yd|sq.ft|marla|kanal|acre","budgetMin":null,"budgetMax":null,"facing":"North|South|East|West|North-East|North-West|South-East|South-West|Corner|Park-Facing","contact":"","notes":""}]
@@ -231,9 +235,13 @@ function isAllowedGroup(chatName) {
   if (!chatName) return false;
   // Exact match
   if (ALLOWED_GROUPS.includes(chatName)) return true;
-  // Fuzzy match — handles minor emoji/spacing differences
+  // Strip ALL non-alphanumeric (emojis, spaces, punctuation) and compare
   const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-  return ALLOWED_GROUPS.some(g => norm(g) === norm(chatName));
+  const normChat = norm(chatName);
+  if (ALLOWED_GROUPS.some(g => norm(g) === normChat)) return true;
+  // Partial match — if chat name CONTAINS any allowed group keyword
+  const keywords = ['aagman','bptp','neharpar','rent faridabad','chikki','faridabad associates','renting in fbd','aman property','sec 81','fbd brokers'];
+  return keywords.some(k => chatName.toLowerCase().includes(k));
 }
  
 // ── Whapi.cloud webhook ────────────────────────────────────────────────
@@ -257,14 +265,16 @@ app.post('/whapi-webhook', async (req, res) => {
     if (!msgBody) continue;
  
     // ── WHITELIST CHECK ────────────────────────────────────────────────
+    console.log(`[Whapi] Received | Group: "${chatName}" | isGroup: ${isGroup} | Allowed: ${isAllowedGroup(chatName)}`);
+ 
     if (isGroup && !isAllowedGroup(chatName)) {
-      console.log(`[Whapi] SKIPPED group: "${chatName}"`);
-      continue; // ignore all other groups silently
+      console.log(`[Whapi] ⛔ SKIPPED group not in whitelist: "${chatName}"`);
+      continue;
     }
  
     // Skip non-group messages (personal chats)
     if (!isGroup) {
-      console.log(`[Whapi] SKIPPED direct msg from: ${name}`);
+      console.log(`[Whapi] ⛔ SKIPPED direct msg from: ${name}`);
       continue;
     }
  
@@ -304,3 +314,4 @@ app.listen(PORT, () => {
   console.log(`   TWILIO_AUTH_TOKEN : ${TWILIO_AUTH_TOKEN ? 'SET ✓' : 'MISSING ✗'}`);
   console.log(`   TWILIO_WA_FROM    : ${TWILIO_WHATSAPP_FROM || 'MISSING ✗'}\n`);
 });
+ 
