@@ -39,11 +39,13 @@ function httpsPostForm(hostname, path, auth, form) {
 // ── Claude parser ──────────────────────────────────────────────────────
 const PARSE_PROMPT = `You are an expert real-estate message interpreter for Faridabad/NCR, Haryana, India.
  
-TYPE CLASSIFICATION:
-"buy"       = wants to PURCHASE (chahiye, required, looking for, lena hai, buyer hai, confirm party)
-"sell"      = wants to SELL (bechna hai, for sale, available for sale, deal for sale, rate/demand quoted)
-"rent_want" = wants to RENT a place (required for rent, rent chahiye, budget X/month, location list as requirement)
-"rent_have" = has property TO RENT OUT (available for rent, rent pe dena hai, kiraye pe)
+TYPE CLASSIFICATION — classify EACH item individually:
+"buy"       = wants to PURCHASE (chahiye, required, looking for, lena hai, buyer hai, confirm party, urgent required)
+"sell"      = wants to SELL (bechna hai, for sale, available, confirmed inventory, rate/demand/price quoted, plot listed with size+block)
+"rent_want" = wants to RENT a place (required for rent, rent chahiye, budget X/month)
+"rent_have" = has property TO RENT OUT (available for rent, rent pe dena hai)
+ 
+MIXED INTENT: A single message can have BOTH sell and buy items. e.g. "Confirmed plots: S blk 245sqyd ... Urgent required plot in gulmohar" — the first items are SELL, last one is BUY. Classify each independently.
  
 CONTEXT SHIFT: If someone changed intent (pehle rent chahiye tha ab bech raha hai), extract CURRENT intent only. Note the shift.
  
@@ -240,7 +242,7 @@ function isAllowedGroup(chatName) {
   const normChat = norm(chatName);
   if (ALLOWED_GROUPS.some(g => norm(g) === normChat)) return true;
   // Partial match — if chat name CONTAINS any allowed group keyword
-  const keywords = ['aagman','bptp','neharpar','rent faridabad','chikki','faridabad associates','renting in fbd','aman property','sec 81','fbd brokers'];
+  const keywords = ['aagman','bptp','neharpar','rent faridabad','chikki','faridabad associates','renting in fbd','aman property','sec 81','fbd brokers','only rent','only renting'];
   return keywords.some(k => chatName.toLowerCase().includes(k));
 }
  
@@ -314,4 +316,3 @@ app.listen(PORT, () => {
   console.log(`   TWILIO_AUTH_TOKEN : ${TWILIO_AUTH_TOKEN ? 'SET ✓' : 'MISSING ✗'}`);
   console.log(`   TWILIO_WA_FROM    : ${TWILIO_WHATSAPP_FROM || 'MISSING ✗'}\n`);
 });
- 
