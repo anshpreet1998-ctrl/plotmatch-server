@@ -56,10 +56,17 @@ PRICE FORMATS:
 - "3 Crore 70 Lakh" or "3.70 Cr" = 37000000
  
 EXTRACTION RULES:
-- Extract EACH property as its own object. Contact at bottom applies to ALL listings.
+- CRITICAL: Extract EACH property as its own separate JSON object — NEVER merge multiple into one
+- NUMBERED LISTS (1. 2. 3.) = each number is a SEPARATE listing — extract ALL numbers
+- BULLETED LISTS (• - *) = each bullet is a SEPARATE listing — extract ALL bullets
+- If message has 3 numbered items → return array with 3 objects
+- Contact/agent name+phone at BOTTOM applies to ALL listings above it
 - Multiple sectors as requirement (84/85/86/87/88) = locality "Sector 84-88 Faridabad"
-- Notes: Stilt+4 approved, NOC, Registry case, Joda/Pair, furnishing, road width, society/project name
+- Notes: Stilt+4 approved, NOC, Registry case, Joda/Pair, furnishing, road width, society/project name, floor number
 - gaj=sq.yd. SF=sq.ft. Marla=272sq.ft. Kanal=20 marla.
+- "2 .10 Cr" or "2. 10 Cr" with space = 2.10 Cr = 21000000
+- "@ 2.55" after property = price 2.55 Cr = 25500000
+- Size range "1400-1450 feet" = use average 1425 as size in sq.ft
  
 RETURN ONLY raw JSON array, zero markdown:
 [{"type":"buy|sell|rent_want|rent_have","category":"Plot|Floor|Flat|House|Shop|Office|Other","bhk":"","locality":"","subLocality":"","size":null,"unit":"sq.yd|sq.ft|marla|kanal|acre","budgetMin":null,"budgetMax":null,"facing":"North|South|East|West|North-East|North-West|South-East|South-West|Corner|Park-Facing","contact":"","notes":""}]
@@ -210,7 +217,8 @@ const ALLOWED_GROUPS = [
   'Chikki Realtors Dealers Group',
   'Faridabad Associates 2',
   '🇮🇳 Only Renting In Fbd',
-  'AMAN PROPERTY'
+  'AMAN PROPERTY',
+  'SEC 81 FBD BROKERS 📍'
 ];
  
 // Groups that are rent-focused (helps AI classify correctly)
