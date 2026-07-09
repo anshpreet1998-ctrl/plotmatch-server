@@ -73,11 +73,30 @@ EXTRACTION RULES:
 - "Plot no 251" or "687 size 162" = plot number, put in notes
 - "Pride" after BPTP plot = BPTP Pride society, add to notes
 - SCO = Shop Cum Office → category=Shop
-- gaj=sq.yd. sqyd=sq.yd. SF/Sqft=sq.ft. Marla=272sq.ft. Kanal=20 marla.
-- "2 .10 Cr" with space = 2.10 Cr = 21000000. "@1.35" = 13500000. "@1.60/yd" = 1.60L/sq.yd × size
+- gaj=sq.yd. sqyd=sq.yd. sy/SY=sq.yd. SF/Sqft=sq.ft. Marla=272sq.ft. Kanal=20 marla.
+- "2 .10 Cr" with space = 2.10 Cr = 21000000. "@1.35"=13500000. "@1.60/yd"=1.60L×size
 - Size range "1400-1450 feet" = average = 1425 sq.ft
-- "Confirm Inventory"/"Available For Sale"/"FOR SALE" = header, all below are type=sell
-- Notes: Stilt+4, NOC, Registry, Joda/Pair, furnishing, map approved, corner, park facing, road width, with roof, with terrace, with basement, swimming pool, semi commercial
+- "Confirm Inventory"/"Available For Sale"/"FOR SALE"/"CONFIRM BPTP PLOTS" = header, all below are type=sell
+- Notes: Stilt+4, NOC, Registry, Joda/Pair, furnishing, map approved, corner, park facing, road width, roof, terrace, basement, pool, semi commercial, naksha passed
+ 
+BPTP SPECIFIC PRICE FORMAT:
+- "@450Reg" / "@355Reg" / "@610Reg" = TOTAL price in LAKHS → budgetMax = number × 100000
+- Example: "@450Reg" = 450 lakh = ₹4.5 Cr = 45000000
+- Example: "@610Reg" = 610 lakh = ₹6.1 Cr = 61000000
+- "@205000 per sqyrd" or "@205000 per sq.yd" = RATE per sq.yd → budgetMax = size × 205000
+- "Reg" suffix ALWAYS = Registry clear → add "Registry" to notes
+- "naksha passed" = map/building plan approved → add to notes
+- "east+park" or "east + park" = facing="East", notes="Park facing"
+ 
+BPTP BLOCK-SIZE CODE FORMAT:
+- "D-250sy" = Block D, 250 sq.yd → subLocality="D Block", size=250, unit="sq.yd"
+- "E-300sy" = Block E, 300 sq.yd → subLocality="E Block"
+- "K-300sy" = Block K → subLocality="K Block"
+- "Pc-229sy" = PC Block → subLocality="PC Block"
+- "Pe-210sy" = PE Block → subLocality="PE Block"
+- "T-264sy" = Block T → subLocality="T Block"
+- Letter(s) before hyphen = block name, number after hyphen + sy = size in sq.yd
+- "MORE OPTIONS IN ALL BLOCKS" / "PLS CALL" = NOT a listing, skip these lines entirely
  
 RETURN ONLY raw JSON array, zero markdown:
 [{"type":"buy|sell|rent_want|rent_have","category":"Plot|Floor|Flat|House|Shop|Office|Other","bhk":"","locality":"","subLocality":"","size":null,"unit":"sq.yd|sq.ft|marla|kanal|acre","budgetMin":null,"budgetMax":null,"facing":"North|South|East|West|North-East|North-West|South-East|South-West|Corner|Park-Facing","contact":"","notes":""}]
