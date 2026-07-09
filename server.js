@@ -84,6 +84,47 @@ EXTRACTION RULES:
 - "Multiple options available" / "For confirmed requirements" = NOT a listing, skip
 - Notes: Stilt+4, NOC, Registry, Joda/Pair, furnishing, map approved, corner, park facing, road width, roof, terrace, basement, pool, semi commercial, naksha passed
  
+SECTION HEADER EMOJIS: 🏛️ and 🛣️ on the SAME line as society name = section header
+- "🏛️*Discovery park*" = Discovery Park is the society/locality for all ➡️ items below
+- "🛣️*Adore Exclusive Sec -86*" = Adore Exclusive, Sector 86 is locality
+- Sub-items under the header use ➡️ 👉 💥 emojis = each is a SEPARATE listing
+ 
+BHK FORMAT WITH EXTRA ROOMS:
+- "2+2" = 2BHK + 2 extra rooms → bhk="2+2 BHK"
+- "3+2" = 3BHK + 2 extra rooms → bhk="3+2 BHK"
+- "3+3" = 3BHK + 3 extra rooms → bhk="3+3 BHK"
+- "3+1" = 3BHK + 1 servant room → bhk="3+1 BHK"
+- "2+1" = 2BHK + 1 servant room → bhk="2+1 BHK"
+ 
+FURNISHING SHORTHAND:
+- "Semi" = Semi-furnished → notes="Semi-furnished"
+- "Raw" = Unfurnished/bare → notes="Raw/Unfurnished"
+- "GF" = Ground Floor → notes="Ground Floor"
+- "Lower" = Lower ground floor → notes="Lower ground floor"
+- "4th +roof" = 4th floor with roof rights → notes="4th floor with roof rights"
+- "Double Storey" = G+1 construction → notes="Double Storey"
+- "Single Storey" = Ground floor only → notes="Single Storey"
+ 
+BUILDER FLOOR SHORTHAND:
+- "B.p.home" or "BP home" or "B.P.Home" = Builder's property / Builder Floor → category="Floor"
+ 
+SECTOR FORMAT WITH DASH:
+- "Sec -76" or "Sec-76" = Sector 76 (dash is just formatting, not subtraction)
+- "Sec -86" = Sector 86
+ 
+PRICE FORMAT:
+- "@ .1.45cr" = typo for 1.45cr = 14500000 (extra dot before number, ignore it)
+- "@ 70Lac" or "@ 68Lac" = 70 lakh = 7000000, 68 lakh = 6800000
+ 
+CONTACT: "Vishwas properties / Jatin Sharma / 9319000940" = all three lines = one contact entry
+ 
+LEFT-POINTING EMOJIS: 👈 👈🏻 👈🏼 👈🏽 👈🏾 👈🏿 (pointing left, with any skin tone) = same as 👉, treat as bullet or emphasis marker
+SKIN TONE EMOJI VARIANTS: Any emoji with 🏻🏼🏽🏾🏿 modifier = same as base emoji
+"Party confirm" / "Confirm party" = the client is verified/serious — NOT a separate listing, add to notes of previous listing as "Confirmed party"
+"Only WhatsApp call SMS" = contact instruction, not a listing — add to contact notes
+"District A B Block" = BPTP District, A Block and B Block → locality="Sector 81 Faridabad", subLocality="District A-B Block"
+"SGA" at end of message = sender's initials, not a listing — skip
+ 
 BPTP SPECIFIC PRICE FORMAT:
 - "@450Reg" / "@355Reg" / "@610Reg" = TOTAL price in LAKHS → budgetMax = number × 100000
 - Example: "@450Reg" = 450 lakh = ₹4.5 Cr = 45000000
@@ -345,3 +386,4 @@ app.listen(PORT, () => {
   console.log(`   TWILIO_AUTH_TOKEN : ${TWILIO_AUTH_TOKEN ? 'SET ✓' : 'MISSING ✗'}`);
   console.log(`   TWILIO_WA_FROM    : ${TWILIO_WHATSAPP_FROM || 'MISSING ✗'}\n`);
 });
+ 
