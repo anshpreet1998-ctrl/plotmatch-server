@@ -81,7 +81,7 @@ Always return array. Extract full name AND phone into contact field.`;
 async function parseWithClaude(text) {
   const result = await httpsPost('api.anthropic.com', '/v1/messages',
     { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-    { model: 'claude-sonnet-4-6', max_tokens: 2000, system: PARSE_PROMPT, messages: [{ role: 'user', content: text }] }
+    { model: 'claude-sonnet-4-6', max_tokens: 4000, system: PARSE_PROMPT, messages: [{ role: 'user', content: text }] }
   );
   if (!result.content) throw new Error('Claude error: ' + JSON.stringify(result).slice(0, 200));
   const txt = result.content.map(b => b.text || '').join('');
