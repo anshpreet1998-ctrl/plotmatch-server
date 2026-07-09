@@ -61,18 +61,23 @@ EXTRACTION RULES:
 - CRITICAL: Extract EACH property as its own separate JSON object — NEVER merge multiple into one
 - A new listing starts when you see a new: sector number, society name, plot size, or price
 - NUMBERED LISTS (1. 2. 3.) = each number is a SEPARATE listing
+- NUMBERED EMOJI BOXES (1️⃣ 2️⃣ 3️⃣ 4️⃣ 5️⃣ etc) = each is a SEPARATE listing — very common in Indian broker groups. Numbers may reset (back to 1️⃣) for each new section — still extract each as separate
+- EMOJI BULLETS (👉 ✅ 🔹 ➡️ ⚡ 💥 🏡 ☞ ✔️ 🙏 •) = each emoji line is a SEPARATE listing
 - BULLETED LISTS (• - * -) = each bullet is a SEPARATE listing
 - LINE BREAKS between properties = each block is a SEPARATE listing
-- SAME SELLER multiple properties = still separate listings, same contact on each
+- SECTION HEADERS: A plain/bold line with just a society or location name ("Bptp plots", "Huda sector 77", "Amolik Asterwood 98", "Bptp Villa") with no size/price = a HEADER that applies to all items listed below it until the next header. Use it as locality for those sub-items
+- MIXED BUY+SELL: classify each item individually — "required/chahiye" = buy even in a sell-heavy message
+- SAME SELLER multiple properties = separate listings, same contact on each
 - Contact/agent name+phone at BOTTOM applies to ALL listings above it
-- If unsure whether it's 1 listing or 2, prefer splitting into separate listings
-- Multiple sectors as requirement (84/85/86/87/88) = locality "Sector 84-88 Faridabad"
-- Notes: Stilt+4 approved, NOC, Registry case, Joda/Pair, furnishing, road width, society/project name, floor number
-- gaj=sq.yd. SF=sq.ft. Marla=272sq.ft. Kanal=20 marla.
-- "2 .10 Cr" or "2. 10 Cr" with space = 2.10 Cr = 21000000
-- "@ 2.55" after property = price 2.55 Cr = 25500000
-- Size range "1400-1450 feet" = use average 1425 as size in sq.ft
-- "Confirm Inventory" or "Available For Sale" = header, all items below are type=sell
+- BPTP PLOT CODES: "PA110"=P-A Block plot 110, "W11-24"=W Block, "M5-15"=M Block, "F3-18"=F Block — block letter goes in subLocality
+- "Plot no 251" or "687 size 162" = plot number, put in notes
+- "Pride" after BPTP plot = BPTP Pride society, add to notes
+- SCO = Shop Cum Office → category=Shop
+- gaj=sq.yd. sqyd=sq.yd. SF/Sqft=sq.ft. Marla=272sq.ft. Kanal=20 marla.
+- "2 .10 Cr" with space = 2.10 Cr = 21000000. "@1.35" = 13500000. "@1.60/yd" = 1.60L/sq.yd × size
+- Size range "1400-1450 feet" = average = 1425 sq.ft
+- "Confirm Inventory"/"Available For Sale"/"FOR SALE" = header, all below are type=sell
+- Notes: Stilt+4, NOC, Registry, Joda/Pair, furnishing, map approved, corner, park facing, road width, with roof, with terrace, with basement, swimming pool, semi commercial
  
 RETURN ONLY raw JSON array, zero markdown:
 [{"type":"buy|sell|rent_want|rent_have","category":"Plot|Floor|Flat|House|Shop|Office|Other","bhk":"","locality":"","subLocality":"","size":null,"unit":"sq.yd|sq.ft|marla|kanal|acre","budgetMin":null,"budgetMax":null,"facing":"North|South|East|West|North-East|North-West|South-East|South-West|Corner|Park-Facing","contact":"","notes":""}]
