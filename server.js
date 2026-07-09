@@ -61,7 +61,7 @@ EXTRACTION RULES:
 - CRITICAL: Extract EACH property as its own separate JSON object — NEVER merge multiple into one
 - A new listing starts when you see a new: sector number, society name, plot size, or price
 - NUMBERED LISTS (1. 2. 3.) = each number is a SEPARATE listing
-- NUMBERED EMOJI BOXES (1️⃣ 2️⃣ 3️⃣ 4️⃣ 5️⃣ etc) = each is a SEPARATE listing — very common in Indian broker groups. Numbers may reset (back to 1️⃣) for each new section — still extract each as separate
+- NUMBERED EMOJI BOXES (1️⃣ 2️⃣ 3️⃣ 4️⃣ 5️⃣ etc) = each is a SEPARATE listing. 📍 pin emoji also = separate listing — very common in Indian broker groups. Numbers may reset (back to 1️⃣) for each new section — still extract each as separate
 - EMOJI BULLETS (👉 ✅ 🔹 ➡️ ⚡ 💥 🏡 ☞ ✔️ 🙏 •) = each emoji line is a SEPARATE listing
 - BULLETED LISTS (• - * -) = each bullet is a SEPARATE listing
 - LINE BREAKS between properties = each block is a SEPARATE listing
@@ -77,6 +77,11 @@ EXTRACTION RULES:
 - "2 .10 Cr" with space = 2.10 Cr = 21000000. "@1.35"=13500000. "@1.60/yd"=1.60L×size
 - Size range "1400-1450 feet" = average = 1425 sq.ft
 - "Confirm Inventory"/"Available For Sale"/"FOR SALE"/"CONFIRM BPTP PLOTS" = header, all below are type=sell
+- "Properties Available for Rent"/"Available for Rent"/"For Rent" = header, all below are type=rent_have
+- "Rent: ₹35,000/month" or "Rent: ₹28,000/Month" = monthly rent budgetMax=35000 or 28000
+- "Rent - 32000" or "Rent- 32000" = monthly rent budgetMax=32000
+- "3+1 BHK" or "3+1" = bhk="3+1 BHK"
+- "Multiple options available" / "For confirmed requirements" = NOT a listing, skip
 - Notes: Stilt+4, NOC, Registry, Joda/Pair, furnishing, map approved, corner, park facing, road width, roof, terrace, basement, pool, semi commercial, naksha passed
  
 BPTP SPECIFIC PRICE FORMAT:
