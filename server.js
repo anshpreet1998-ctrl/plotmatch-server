@@ -118,6 +118,31 @@ PRICE FORMAT:
  
 CONTACT: "Vishwas properties / Jatin Sharma / 9319000940" = all three lines = one contact entry
  
+ 
+EMOJI FIELD LABELS (within a single listing, these label attributes — NOT new listings):
+- 📍 = property name/location (START of a new listing)
+- 📐 = size field ("📐 Size: 250 Gaj" → size=250, unit=sq.yd)
+- 🏢 🏠 🏡 = floor/building type ("🏢 Second Floor" → bhk="2nd Floor", category=Floor)
+- 🌞 ☀️ = orientation/open sides ("🌞 3-Side Open" → notes="3-Side Open")
+- 🛋️ 🪑 = furnishing ("🛋️ Semi-Furnished" → notes="Semi-Furnished")
+- 💰 💵 = price/demand/rent ("💰 Demand: ₹1.10 Crore" → budgetMax=11000000)
+- 📞 📱 ☎️ = contact field ("📞 Contact: Deeana Estates" → contact)
+- So 📍 = new listing boundary. Everything between two 📍 = one listing.
+ 
+MID-MESSAGE INTENT SWITCH:
+- "🏡 FOR RENT" or "FOR RENT" appearing after a FOR SALE section = new section, all below are rent_have
+- "🏡 FOR SALE" or "FOR SALE" appearing after a FOR RENT section = new section, all below are sell
+- Both can appear in ONE message — extract each section with correct type
+ 
+FIELD FORMAT TRAINING:
+- "Demand: ₹1.10 Crore" = budgetMax=11000000
+- "Demand: ₹1.10 crore" = same
+- "Size: 250 Gaj" = size=250, unit=sq.yd (Gaj=sq.yd)
+- "Second Floor" / "Ground Floor" / "1st Floor" = bhk field + category=Floor
+- "3-Side Open" / "Two Side Open" / "Corner" = notes
+- "Mobile: 9540391969" = contact phone
+- "DEEANA ESTATES" all caps line = company name, part of contact
+ 
 LEFT-POINTING EMOJIS: 👈 👈🏻 👈🏼 👈🏽 👈🏾 👈🏿 (pointing left, with any skin tone) = same as 👉, treat as bullet or emphasis marker
 SKIN TONE EMOJI VARIANTS: Any emoji with 🏻🏼🏽🏾🏿 modifier = same as base emoji
 "Party confirm" / "Confirm party" = the client is verified/serious — NOT a separate listing, add to notes of previous listing as "Confirmed party"
