@@ -311,11 +311,8 @@ function formatINR(n) {
  
 // ── WHITELISTED GROUPS ─────────────────────────────────────────────────
 const ALLOWED_GROUPS = [
-  'Aagman Infra FBD Inventory',
-  'Bptp Properties Faridabad 🏠',
   'All Properties Neharpar',
   'ᴏɴʟʏ ꜰᴏʀ ʀᴇɴᴛ ꜰᴀʀɪᴅᴀʙᴀᴅ',
-  'Chikki Realtors Dealers Group',
   'Faridabad Associates 2',
   '🇮🇳 Only Renting In Fbd',
   'AMAN PROPERTY',
@@ -337,7 +334,7 @@ function isAllowedGroup(chatName) {
   const normChat = norm(chatName);
   if (ALLOWED_GROUPS.some(g => norm(g) === normChat)) return true;
   // Partial match — if chat name CONTAINS any allowed group keyword
-  const keywords = ['aagman','bptp','neharpar','rent faridabad','chikki','faridabad associates','renting in fbd','aman property','sec 81','fbd brokers','only rent','only renting'];
+  const keywords = ['neharpar','rent faridabad','faridabad associates','renting in fbd','aman property','sec 81','fbd brokers','only rent','only renting'];
   return keywords.some(k => chatName.toLowerCase().includes(k));
 }
  
@@ -394,6 +391,7 @@ app.post('/whapi-webhook', async (req, res) => {
         name: name,
         source: 'whatsapp-group',
         chatName,
+        groupName: chatName,
         receivedAt: Date.now()
       });
       processedCount++;
