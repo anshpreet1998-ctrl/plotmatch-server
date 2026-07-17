@@ -361,6 +361,7 @@ app.post('/whapi-webhook', async (req, res) => {
     const chatId   = msg.chat_id || from;
     const chatName = msg.chat_name || msg.chat?.name || '';
     const isGroup  = chatId.includes('@g.us');
+    const postedAt = msg.timestamp ? msg.timestamp * 1000 : Date.now();
  
     if (!msgBody) continue;
  
@@ -398,7 +399,8 @@ app.post('/whapi-webhook', async (req, res) => {
         source: 'whatsapp-group',
         chatName,
         groupName: chatName,
-        receivedAt: Date.now()
+        receivedAt: Date.now(),
+        postedAt: postedAt
       });
       processedCount++;
  
