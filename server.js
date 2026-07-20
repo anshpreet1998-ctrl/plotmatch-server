@@ -266,11 +266,12 @@ function formatINR(n) {
 const ALLOWED_GROUPS = [
   'All Properties Neharpar',
   'AMAN PROPERTY',
-  'SEC 81 FBD BROKERS 📍'
+  'SEC 81 FBD BROKERS 📍',
+  'ᴏɴʟʏ ꜰᴏʀ ʀᴇɴᴛ ꜰᴀʀɪᴅᴀʙᴀᴅ'
 ];
 
 // Groups that are rent-focused (helps AI classify correctly)
-const RENT_GROUPS = [];
+const RENT_GROUPS = ['ᴏɴʟʏ ꜰᴏʀ ʀᴇɴᴛ ꜰᴀʀɪᴅᴀʙᴀᴅ'];
 
 function isAllowedGroup(chatName) {
   if (!chatName) return false;
@@ -281,7 +282,7 @@ function isAllowedGroup(chatName) {
   const normChat = norm(chatName);
   if (ALLOWED_GROUPS.some(g => norm(g) === normChat)) return true;
   // Partial match — if chat name CONTAINS any allowed group keyword
-  const keywords = ['neharpar','aman property','sec 81','fbd brokers'];
+  const keywords = ['neharpar','aman property','sec 81','fbd brokers','only for rent','rent faridabad'];
   return keywords.some(k => chatName.toLowerCase().includes(k));
 }
 
