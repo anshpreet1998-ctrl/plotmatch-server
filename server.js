@@ -93,15 +93,25 @@ RETURN only raw JSON array, no markdown:
 [{"type":"buy|sell|rent_want|rent_have","category":"Plot|Floor|Flat|House|Shop|Office|Other","bhk":"","locality":"","subLocality":"","size":null,"unit":"sq.yd|sq.ft|marla|kanal|acre","budgetMin":null,"budgetMax":null,"facing":"North|South|East|West|North-East|North-West|South-East|South-West|Corner|Park-Facing","contact":"","notes":""}]
 Always array. Name+phone in contact.`;
 
-async function parseWithClaude(text) {
-  const result = await httpsPost('api.anthropic.com', '/v1/messages',
+async function parseWithClaude(text, retries=2) {
+  let lastError;
+  for(let attempt=0; attempt<=retries; attempt++){
+   try{
+    const result = await httpsPost('api.anthropic.com', '/v1/messages',
     { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-    { model: 'claude-sonnet-4-6', max_tokens: 4000, system: PARSE_PROMPT, messages: [{ role: 'user', content: text }] }
+    { model: 'claude-sonnet-4-6', max_tokens: 4096, system: PARSE_PROMPT, messages: [{ role: 'user', content: text }] }
   );
-  if (!result.content) throw new Error('Claude error: ' + JSON.stringify(result).slice(0, 200));
-  const txt = result.content.map(b => b.text || '').join('');
-  const parsed = JSON.parse(txt.replace(/```json|```/g, '').trim());
-  return Array.isArray(parsed) ? parsed : [parsed];
+      if (!result.content) throw new Error('Claude error: ' + JSON.stringify(result).slice(0, 200));
+      const txt = result.content.map(b => b.text || '').join('');
+      const parsed = JSON.parse(txt.replace(/```json|```/g, '').trim());
+      return Array.isArray(parsed) ? parsed : [parsed];
+    } catch(e) {
+      lastError = e;
+      console.error(`[Claude] Attempt ${attempt+1} failed:`, e.message);
+      if(attempt < retries) await new Promise(r => setTimeout(r, 1500));
+    }
+  }
+  throw lastError;
 }
 
 // ── Twilio send ────────────────────────────────────────────────────────
@@ -277,11 +287,14 @@ function isAllowedGroup(chatName) {
 
 // ── Whapi.cloud webhook ────────────────────────────────────────────────
 app.post('/whapi-webhook', async (req, res) => {
+  // ACK immediately — Whapi needs response within 5 seconds or it retries
   res.status(200).json({ status: 'ok' });
 
   const messages = req.body.messages || [];
   if (!messages.length) return;
 
+  // Process async after ACK so Whapi doesn't timeout
+  setImmediate(async () => {
   for (const msg of messages) {
     if (msg.type !== 'text') continue;
     if (msg.from_me) continue;
@@ -352,6 +365,7 @@ app.post('/whapi-webhook', async (req, res) => {
       console.error('[Whapi parse error]', err.message);
     }
   }
+  }); // end setImmediate
 });
 
 app.listen(PORT, () => {
