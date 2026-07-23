@@ -103,6 +103,44 @@ MIXED: Same message can have buy AND sell items. Classify each individually.
 SHIFT: If intent changed (rent→sell), extract current only, note shift.
 FOR SALE/CONFIRM/Available = all below are sell. FOR RENT/Available for Rent = all below are rent_have.
 
+
+NEW EMOJI BULLETS: 📌 (pushpin) and 🌟 ⭐ 💫 = also valid bullets/separators
+🌟 FOR SALE / ⭐ FOR SALE = same as FOR SALE header
+📌 before society name = new listing start (same as 📍)
+
+BPTP DISTRICT FORMAT:
+- "BPTP DISTRICT -1, BLOCK-C" or "DIST 1, BLK B" = BPTP District 1, C/B Block → locality="BPTP District 1", subLocality="C Block"
+- "DIST 1, BLK B, C-48, NORTH 150YD" = District 1, B Block, plot C-48, 150 sq.yd, North facing
+- "M3/??" = M3 block, plot number unknown → subLocality="M3 Block"
+- "J BLK 250YD" = J Block, 250 sq.yd
+
+FACING COMBOS:
+- "NORTH+ PARK FACE" or "NORTH+PARK" = North facing + Park facing → facing="North", notes="Park facing"
+- "EAST PARK FACE" = East facing + Park facing → facing="East", notes="Park facing"
+
+PLOT TYPES:
+- "PAIR" or "PAIR PLOT" = two adjacent plots → notes="Pair/Joda plot"
+- "TWO SIDE OPEN" = 2 side open → notes="Two side open"
+- "STILL+4" or "STILT+4ALLOWED" = typo for Stilt+4 approved → notes="Stilt+4 approved"
+
+PRICE:
+- "@ 3.60" = 3.60 Cr = 36000000. "@ 1.20" = 1.20 Cr = 12000000
+- "on call" / "price on call" / "on 📱 call" = no price → budgetMax=null, notes="Price on call"
+- "@ reasonable price" or "reasonable price" = budgetMax=null, notes="Reasonable price"
+
+ROAD WIDTH:
+- "45 MTR WIDE ROAD" or "24 MTR ROAD" = add to notes as "45m road frontage"
+
+SOCIETY TYPOS:
+- "AMOLIK BLOOSOM" = Amolik Blossom
+- "Amolik hights" = Amolik Heights
+- "adorr" = Adore
+- "STILL" = Stilt
+- "PH-1" = Phase 1 → add to subLocality or notes
+
+COMPANY NAME AT BOTTOM:
+- "GOODLAND PROPERTY INVESTMENTS" / "ASSET BUILDERS" / "VISHWAS PROPERTIES" etc = company name, part of contact
+- Phone number below company name = contact phone for ALL listings above
 RETURN only raw JSON array, no markdown:
 [{"type":"buy|sell|rent_want|rent_have","category":"Plot|Floor|Flat|House|Shop|Office|Other","bhk":"","locality":"","subLocality":"","size":null,"unit":"sq.yd|sq.ft|marla|kanal|acre","budgetMin":null,"budgetMax":null,"facing":"North|South|East|West|North-East|North-West|South-East|South-West|Corner|Park-Facing","contact":"","notes":""}]
 Always array. Name+phone in contact.`;
