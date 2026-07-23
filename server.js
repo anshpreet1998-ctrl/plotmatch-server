@@ -83,7 +83,21 @@ BPTP: Section header (Bptp plots/Huda sector 77/Amolik etc) applies to all items
 EMOJI FIELDS (within one listing, not separators):
 📍=location/new listing. 📐=size. 🏢🏠=floor. 🛋️=furnishing. 💰=price. 📞=contact
 
-SKIP: "MORE OPTIONS IN ALL BLOCKS", "PLS CALL", "Party confirm"→notes, "Multiple options available", "SGA", "Only WhatsApp call SMS", "Jai Guru Ji"
+INVENTORY FORMAT (very common in Faridabad groups):
+- "SELL INVENTORY" header = ALL items below are type=sell until next section
+- "RENT INVENTORY" header = ALL items below are type=rent_have until next section  
+- Society name on its own line (Adore Happy Homes, Adore Grand, Amolik Heights etc) = locality header
+- "2bhk, 3bhk more options available" under a society = extract as 2 SEPARATE sell listings (one 2BHK, one 3BHK) for that society
+- "1bhk, 2bhk, 3bhk more options available" = 3 SEPARATE listings
+- "2bhk row, semi, fully furnished available" = 3 SEPARATE listings (raw/unfurnished, semi-furnished, fully furnished)
+- "row" = Raw = Unfurnished → notes="Raw/Unfurnished"
+- "more options available" alone = NOT a separate listing, skip
+- "Option available" alone = NOT a separate listing, skip
+- "Req." or "Req" at start = BUYER (buy), even in rent groups — NEVER classify as rent
+- "ASSET BUILDERS" = company signature at end, part of contact
+- "Amolik hights/heights" = Amolik Heights society
+
+SKIP: "MORE OPTIONS IN ALL BLOCKS", "PLS CALL", "Party confirm"→notes, "Multiple options available", "Option available", "More options available", "SGA", "Only WhatsApp call SMS", "Jai Guru Ji"
 
 MIXED: Same message can have buy AND sell items. Classify each individually.
 SHIFT: If intent changed (rent→sell), extract current only, note shift.
@@ -338,9 +352,9 @@ app.post('/whapi-webhook', async (req, res) => {
       continue;
     }
 
-    // Check if this is a rent-focused group — hint to AI
+    // Check if this is a rent-focused group — hint to AI (only when intent is truly unclear)
     const isRentGroup = RENT_GROUPS.some(g => g === chatName || chatName.toLowerCase().includes('rent'));
-    const rentHint = isRentGroup ? '\n\nNOTE: This message is from a RENT group. If intent is unclear, classify as rent_want or rent_have.' : '';
+    const rentHint = isRentGroup ? '\n\nNOTE: This message is from a RENT group. ONLY if intent is completely unclear (no buy/sell/req/required/chahiye/for sale words), classify as rent_want or rent_have. NEVER override explicit words like Req./Required/Requirement (=buy) or For Sale/Sell Inventory (=sell).' : '';
 
     try {
       const listings = await parseWithClaude(msgBody + rentHint);
